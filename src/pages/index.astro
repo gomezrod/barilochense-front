@@ -1,0 +1,215 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getHealth, getNavigation, getTourismArticles, type ArticleListItem, type NavigationResponse } from '../lib/api';
+
+const [healthResult, navigationResult, articlesResult] = await Promise.allSettled([getHealth(), getNavigation(), getTourismArticles()]);
+const apiTime = healthResult.status === 'fulfilled' ? healthResult.value.time : null;
+const navigation: NavigationResponse | null = navigationResult.status === 'fulfilled' ? navigationResult.value : null;
+const articles: ArticleListItem[] = articlesResult.status === 'fulfilled' ? articlesResult.value.items : [];
+const articleError = articlesResult.status === 'rejected';
+const navError = navigationResult.status === 'rejected';
+const apiArticlesAvailable = navigation?.capabilities.articles ?? true;
+const legacyLinks = navigation?.navigation.filter((entry) => entry.kind === 'legacyLink') ?? [];
+const getLegacyLink = (...labels: string[]): string =>
+  legacyLinks.find((entry) => labels.some((label) => entry.label.toLocaleLowerCase().includes(label.toLocaleLowerCase())))?.href ?? '/#';
+const agendaHref = getLegacyLink('agenda');
+const diariosHref = getLegacyLink('diarios');
+const farmaciasHref = getLegacyLink('farmacias');
+const dolarHref = getLegacyLink('dólar', 'dolar');
+const formattedApiDate = apiTime
+  ? new Intl.DateTimeFormat('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'America/Argentina/Buenos_Aires',
+    }).format(new Date(apiTime))
+  : 'Fecha y hora no disponibles';
+
+const heroFallback = [
+  { title: 'Se viene la agenda de agosto en Bariloche: música, teatro y cine', time: 'Hace 2 horas', category: 'Agenda', color: 'var(--violeta)', image: 'https://www.barilochense.com/suplementos/fimba-festival/medium/82940.jpg', icon: 'music' },
+  { title: 'Muestra de artistas locales en el Centro Cívico', time: 'Hace 3 horas', category: 'Cultura', color: 'var(--cultura)', image: 'https://www.barilochense.com/suplementos/cultura/medium/83170.jpg', icon: 'museum' },
+  { title: 'Circuito Chico: el paseo más elegido del invierno', time: 'Hace 4 horas', category: 'Turismo', color: 'var(--teal)', image: 'https://www.barilochense.com/suplementos/informacion-turistica/medium/31979.jpg', icon: 'mountain' },
+  { title: 'Cinco lugares para el mejor chocolate caliente', time: 'Hace 6 horas', category: 'Gourmet', color: 'var(--rojo)', image: 'https://www.barilochense.com/suplementos/recetas-patagonicas/medium/83080.jpg', icon: 'mountain' },
+  { title: 'Vecinos de Belgrano piden mejoras en el alumbrado', time: 'Hace 8 horas', category: 'Comunidad', color: 'var(--naranja)', image: 'https://www.barilochense.com/suplementos/bariloche-noticias/medium/83051.jpg', icon: 'users' },
+];
+
+const exploreCards = [
+  { title: 'Agenda', description: 'Qué hacer hoy en Bariloche', color: 'var(--violeta)', icon: 'music', href: agendaHref },
+  { title: 'Cultura', description: 'Museos, teatro, música y arte', color: 'var(--cultura)', icon: 'museum', href: 'https://www.barilochense.com/cultura' },
+  { title: 'Turismo', description: 'Excursiones, noticias, recomendaciones y experiencias', color: 'var(--teal)', icon: 'mountain', href: 'https://www.barilochense.com/turismo' },
+  { title: 'Gourmet', description: 'Sabores, restaurantes y productos regionales', color: 'var(--rojo)', icon: 'mountain', href: 'https://www.barilochense.com/gourmet' },
+  { title: 'Comunidad', description: 'Información y servicios para vecinos', color: 'var(--naranja)', icon: 'users', href: '/#' },
+];
+
+const quickLinks = [
+  { label: 'Radios', value: 'Escuchá en vivo', icon: '◉', className: 'qband-radios', href: '/#' },
+  { label: 'Diarios', value: 'Las noticias de hoy', icon: '▤', className: 'qband-diarios', href: diariosHref },
+  { label: 'Farmacias', value: 'De turno hoy', icon: '✚', className: 'qband-farmacia', href: farmaciasHref },
+  { label: 'Clima', value: 'Bariloche', icon: '☼', className: 'qband-clima', href: '/#' },
+  { label: 'Dólar', value: 'Cotización', icon: '$', className: 'qband-dolar', href: dolarHref },
+];
+
+const fallbackArticles = [
+  { title: 'Biblioteca Sarmiento', summary: 'Préstamo de libros y sala de lectura', category: 'Cultura', image: 'https://www.barilochense.com/suplementos/bibliotecasarmiento/medium/83186.jpg' },
+  { title: 'Mountain Store', summary: 'Indumentaria y equipo de montaña', category: 'Turismo', image: 'https://www.barilochense.com/suplementos/mountain-store/medium/82673.jpg' },
+  { title: 'B Shows', summary: 'Espectáculos y shows en vivo', category: 'Agenda', image: 'https://www.barilochense.com/suplementos/b-shows/medium/83152.jpg' },
+  { title: 'Ice Bar', summary: 'Bar de hielo en Bariloche', category: 'Turismo', image: 'https://www.barilochense.com/suplementos/bar-de-hielo/medium/82459.jpg' },
+];
+
+const displayedArticles = articles.length > 0 ? articles.slice(0, 8) : fallbackArticles;
+---
+
+<Layout title="Barilochense.com — Cultura y Turismo">
+  <div class="frame">
+    <header class="site-header">
+      <div class="header-left">
+        <a class="header-brand" href="/" aria-label="Volver al inicio">
+          <img class="logo" src="/images/logo-header.jpg" alt="Barilochense.com" />
+          <span class="header-brand-col"><span class="header-brand-text">Barilochense</span><span class="header-claim">Cultura y Turismo</span></span>
+        </a>
+        <nav class="site-nav" aria-label="Secciones principales">
+          <a class="nav-agenda active" href={agendaHref}>Agenda</a>
+          <a class="nav-cultura" href="/#">Cultura</a>
+          <a class="nav-turismo" href="/#turismo">Turismo</a>
+          <a class="nav-gourmet" href="/#">Gourmet</a>
+          <a class="nav-comunidad" href="/#">Comunidad</a>
+        </nav>
+        <span class="divider-v" aria-hidden="true"></span>
+      </div>
+      <div class="header-right">
+        <div class="site-utility"><a class="utility-link" href={diariosHref}>Diarios</a><time class="utility-date" datetime={apiTime ?? undefined}>{formattedApiDate}</time></div>
+        <div class="site-icons">
+          <button class="menu-btn" aria-label="Buscar" data-panel="search"><svg class="icon"><use href="#search"></use></svg></button>
+          <button class="menu-btn" aria-label="Ingresar" data-panel="user"><svg class="icon"><use href="#user"></use></svg></button>
+          <button class="menu-btn" id="menuOpen" aria-label="Abrir menú" aria-expanded="false"><svg class="icon"><use href="#menu"></use></svg></button>
+        </div>
+      </div>
+    </header>
+
+    <div class="mobile-utility-bar">
+      <a class="utility-link" href={diariosHref}>Diarios</a>
+      <time class="utility-date" datetime={apiTime ?? undefined}>{formattedApiDate}</time>
+      <a class="utility-link utility-radios" href="/#"><svg class="icon"><use href="#radio"></use></svg> Radios</a>
+    </div>
+
+    <main>
+      <section class="hero-layout" aria-label="Contenido destacado">
+        <div class="hero-col">
+          <div class="hero-slide">
+            <div class="img" id="heroImg">
+              {heroFallback.map((slide, index) => (
+                <div class:list={['hero-slide-item', { active: index === 0 }]} data-index={index}>
+                  <img class="hero-photo" src={slide.image} alt={slide.category} data-fallback />
+                  <span class="hero-badge" style={`color:${slide.color}`}><svg class="icon" style="width:11px;height:11px"><use href={`#${slide.icon}`}></use></svg>{slide.category}</span>
+                </div>
+              ))}
+              <div class="hero-dots">
+                {heroFallback.map((_slide, index) => <button class:list={['hero-dot', { active: index === 0 }]} data-index={index} aria-label={`Nota ${index + 1}`}></button>)}
+              </div>
+            </div>
+            <div class="hero-caption">
+              <h1 id="heroCaptionTitle">{heroFallback[0].title}</h1>
+              <p id="heroCaptionTime">{heroFallback[0].time}</p>
+            </div>
+          </div>
+        </div>
+        <div class="explore-col">
+          {exploreCards.map((card) => (
+            <a class="explore-card" href={card.href} style={`border-left-color:${card.color}`}>
+              <span class="ex-thumb" style={`background:${card.color}22;color:${card.color};display:grid;place-items:center`}><svg class="icon" style="width:32px;height:32px"><use href={`#${card.icon}`}></use></svg></span>
+              <span class="ex-txt"><span class="ex-head"><span class="ex-title" style={`color:${card.color}`}>{card.title}</span><span class="ex-arrow" style={`color:${card.color}`}><em>Ver todo</em><svg class="icon"><use href="#arrow"></use></svg></span></span><span class="ex-desc">{card.description}</span></span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <nav class="quick-bands" aria-label="Accesos rápidos">
+        {quickLinks.map((link) => <a class:list={['qband', link.className]} href={link.href}><span class="qband-icon">{link.icon}</span><span class="qband-text"><span class="qband-label">{link.label}</span><span class="qband-value">{link.value}</span></span></a>)}
+      </nav>
+
+      <section class="content-section" id="turismo">
+        <div class="section-heading"><span class="section-label">Últimas noticias</span><span class="section-label" style="color:var(--teal)">Turismo</span></div>
+        <p class="section-description">{articlesResult.status === 'fulfilled' && apiArticlesAvailable ? 'Datos útiles, horarios y guías para tu visita a Bariloche' : 'Contenido destacado de Bariloche'}</p>
+        {navError && <p class="api-note">La navegación está mostrando los accesos disponibles de la maqueta.</p>}
+        {articleError && <p class="api-note" role="status">No pudimos actualizar las noticias; mostramos una selección de respaldo.</p>}
+        {displayedArticles.length > 0 ? (
+          <div class="news-grid">
+            {displayedArticles.map((article) => {
+              const isApiArticle = 'id' in article;
+              const title = article.title;
+              const summary = isApiArticle ? article.summary : article.summary;
+              const image = isApiArticle ? article.image.url : article.image;
+              const category = isApiArticle ? 'TURISMO' : article.category.toUpperCase();
+              const href = isApiArticle ? article.legacyUrl : '/#';
+              return <a class="news-card" href={href} aria-label={`Leer ${title}`}><img class="news-thumb" src={image} alt={title} data-fallback /><span class="news-body"><span class="eyebrow-tag">{category}</span><span class="card-title">{title}</span>{summary && <span class="card-summary">{summary}</span>}</span></a>;
+            })}
+          </div>
+        ) : <p class="api-note">Todavía no hay noticias para mostrar.</p>}
+        <div class="pager" aria-label="Paginación"><button disabled aria-label="Página anterior">←</button><span>1 / 1</span><button disabled aria-label="Página siguiente">→</button></div>
+      </section>
+
+      <div class="ad-slot"><span class="ad-label">Publicidad</span><span class="ad-size">970 × 120</span></div>
+    </main>
+
+    <footer class="site-footer">
+      <div><img class="logo-footer" src="/images/logo-footer.jpg" alt="Barilochense.com" /><div class="social"><a href="/#" aria-label="Facebook">f</a><a href="/#" aria-label="Instagram">◎</a></div></div>
+      <div><p class="footer-col-title">Secciones</p><div class="footer-links"><a href={agendaHref}>Agenda</a><a href="/#">Cultura</a><a href="/#turismo">Turismo</a><a href="/#">Gourmet</a><a href="/#">Comunidad</a><a href={farmaciasHref}>Farmacias</a></div></div>
+      <div><p class="footer-col-title">Servicios</p><div class="footer-links"><a href="/#">Clima</a><a href="/#">Mapas de Bariloche</a><a href="/#">Teléfonos útiles</a><a href="/#">Radios en línea</a><a href="/#">Todas las guías</a></div></div>
+      <div class="desktop-link"><p class="footer-col-title">Institucional</p><div class="footer-links"><a href="/#">Quiénes somos</a><a href="/#">Publicidad</a><a href="/#">Contacto</a><a href="/#">Términos y privacidad</a></div></div>
+    </footer>
+    <div class="footer-bottom"><p>© 2003–2026 Barilochense.com — Todos los derechos reservados</p></div>
+  </div>
+
+  <div class="sticky-ad"><div class="ad-slot"><span class="ad-label">Publicidad</span><span class="ad-size">320 × 50</span></div></div>
+  <div class="dr-overlay" id="drOverlay"></div>
+  <aside class="drawer" id="drawer" aria-label="Menú" aria-hidden="true">
+    <button class="dr-close" id="drClose" aria-label="Cerrar menú"><svg class="icon"><use href="#close"></use></svg></button>
+    <a class="dr-inicio" href="/"><img src="/images/logo-header.jpg" alt="" />Inicio</a>
+    <ul class="dr-list">
+      <li class="is-agenda"><a class="dr-row" href={agendaHref}><svg class="icon ic"><use href="#music"></use></svg>Agenda Cultural</a></li>
+      <li class="is-cultura"><a class="dr-row" href="/#"><svg class="icon ic"><use href="#museum"></use></svg>Cultura</a></li>
+      <li class="is-gourmet"><a class="dr-row" href="/#"><svg class="icon ic"><use href="#mountain"></use></svg>Guía Gourmet</a></li>
+      <li class="is-turismo"><a class="dr-row" href="/#turismo"><svg class="icon ic"><use href="#mountain"></use></svg>Turismo</a></li>
+      <li class="is-comunidad"><button class="dr-row" id="drSoc" aria-expanded="false"><svg class="icon ic"><use href="#users"></use></svg>Comunidad<svg class="icon arr"><use href="#arrow"></use></svg></button><ul class="dr-sub" id="drSub" hidden>{['Diarios','Radios','Guía Gourmet','Deportes','Farmacias','Cultura','Tecnología','Ecología','Educación','Medios','Servicios','Guías','Salud'].map((item) => <li><a href={item === 'Diarios' ? diariosHref : item === 'Farmacias' ? farmaciasHref : '/#'}>{item}</a></li>)}</ul></li>
+    </ul>
+    <div class="dr-foot"><span class="lbl">Contactanos:</span><div class="dr-social"><a href="/#" aria-label="Instagram">◎</a><a href="/#" aria-label="Facebook">f</a><a href="/#" aria-label="Escribinos">✉</a></div></div>
+  </aside>
+</Layout>
+
+<script>
+  const slides = [
+    { title: 'Se viene la agenda de agosto en Bariloche: música, teatro y cine', time: 'Hace 2 horas' },
+    { title: 'Muestra de artistas locales en el Centro Cívico', time: 'Hace 3 horas' },
+    { title: 'Circuito Chico: el paseo más elegido del invierno', time: 'Hace 4 horas' },
+    { title: 'Cinco lugares para el mejor chocolate caliente', time: 'Hace 6 horas' },
+    { title: 'Vecinos de Belgrano piden mejoras en el alumbrado', time: 'Hace 8 horas' },
+  ];
+  const items = [...document.querySelectorAll<HTMLElement>('.hero-slide-item')];
+  const dots = [...document.querySelectorAll<HTMLButtonElement>('.hero-dot')];
+  const title = document.querySelector<HTMLElement>('#heroCaptionTitle');
+  const time = document.querySelector<HTMLElement>('#heroCaptionTime');
+  let current = 0;
+  let timer = window.setInterval(() => show((current + 1) % slides.length), 6000);
+  function show(index: number) {
+    current = index;
+    items.forEach((item, i) => item.classList.toggle('active', i === index));
+    dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
+    if (title) title.textContent = slides[index].title;
+    if (time) time.textContent = slides[index].time;
+  }
+  dots.forEach((dot, index) => dot.addEventListener('click', () => { show(index); window.clearInterval(timer); timer = window.setInterval(() => show((current + 1) % slides.length), 6000); }));
+
+  const drawer = document.querySelector<HTMLElement>('#drawer');
+  const overlay = document.querySelector<HTMLElement>('#drOverlay');
+  const menuButton = document.querySelector<HTMLButtonElement>('#menuOpen');
+  const closeMenu = () => { drawer?.classList.remove('open'); overlay?.classList.remove('open'); document.body.classList.remove('menu-open'); menuButton?.setAttribute('aria-expanded', 'false'); drawer?.setAttribute('aria-hidden', 'true'); };
+  menuButton?.addEventListener('click', () => { drawer?.classList.add('open'); overlay?.classList.add('open'); document.body.classList.add('menu-open'); menuButton.setAttribute('aria-expanded', 'true'); drawer?.setAttribute('aria-hidden', 'false'); });
+  document.querySelector('#drClose')?.addEventListener('click', closeMenu);
+  overlay?.addEventListener('click', closeMenu);
+  document.querySelector<HTMLButtonElement>('#drSoc')?.addEventListener('click', (event) => { const button = event.currentTarget as HTMLButtonElement; const sub = document.querySelector<HTMLElement>('#drSub'); const expanded = button.getAttribute('aria-expanded') === 'true'; button.setAttribute('aria-expanded', String(!expanded)); if (sub) sub.hidden = expanded; });
+  document.querySelectorAll<HTMLButtonElement>('[data-panel]').forEach((button) => button.addEventListener('click', () => { drawer?.classList.add('open'); overlay?.classList.add('open'); document.body.classList.add('menu-open'); }));
+  document.querySelectorAll<HTMLImageElement>('[data-fallback]').forEach((image) => image.addEventListener('error', () => { image.src = '/favicon.svg'; }));
+</script>
